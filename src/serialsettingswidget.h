@@ -5,6 +5,10 @@
 #include "imodbus.h"
 #include "modbus.h"
 
+class QextSerialEnumerator;
+class QextPortInfo;
+class QTimer;
+
 namespace Ui {
 class SerialSettingsWidget;
 }
@@ -39,9 +43,16 @@ public slots:
 
 private slots:
 	void on_checkBox_clicked(bool checked);
+	void onSerialPortsChanged();
+	void refreshSerialPorts();
 
 private:
+	bool isSerialActive() const;
+	QString portDisplayName(const QextPortInfo &port) const;
+	QString portDeviceName(const QextPortInfo &port) const;
 
+	QextSerialEnumerator *m_enumerator;
+	QTimer *m_refreshPortsTimer;
 };
 
 #endif // SERIALSETTINGSWIDGET_H

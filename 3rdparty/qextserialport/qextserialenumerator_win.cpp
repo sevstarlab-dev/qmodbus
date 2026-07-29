@@ -34,6 +34,10 @@ QextSerialEnumerator::~QextSerialEnumerator( )
     DEFINE_GUID(GUID_DEVCLASS_PORTS, 0x4D36E978, 0xE325, 0x11CE, 0xBF, 0xC1, 0x08, 0x00, 0x2B, 0xE1, 0x03, 0x18 );
 #endif
 
+#ifndef GUID_DEVINTERFACE_COMPORT
+    DEFINE_GUID(GUID_DEVINTERFACE_COMPORT, 0x86e0d1e0L, 0x8089, 0x11d0, 0x9c, 0xe4, 0x08, 0x00, 0x3e, 0x30, 0x1f, 0x73);
+#endif
+
 /* Gordon Schumacher's macros for TCHAR -> QString conversions and vice versa */
 #ifdef UNICODE
     #define QStringToTCHAR(x)     (wchar_t*) x.utf16()
@@ -101,6 +105,7 @@ void QextSerialEnumerator::enumerateDevicesWin( const GUID & guid, QList<QextPor
 }
 
 #ifdef QT_GUI_LIB
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 bool QextSerialRegistrationWidget::winEvent( MSG* message, long* result )
 {
     if ( message->message == WM_DEVICECHANGE ) {
@@ -110,6 +115,18 @@ bool QextSerialRegistrationWidget::winEvent( MSG* message, long* result )
     }
     return false;
 }
+#else
+bool QextSerialRegistrationWidget::nativeEvent( const QByteArray & /*eventType*/, void * msg, long * result )
+{
+    MSG * message = static_cast<MSG *>( msg );
+    if ( message->message == WM_DEVICECHANGE ) {
+        qese->onDeviceChangeWin( message->wParam, message->lParam );
+        *result = 1;
+        return true;
+    }
+    return false;
+}
+#endif
 #endif
 
 void QextSerialEnumerator::setUpNotifications( )
@@ -123,13 +140,9 @@ void QextSerialEnumerator::setUpNotifications( )
     ZeroMemory(&dbh, sizeof(dbh));
     dbh.dbcc_size = sizeof(dbh);
     dbh.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
-    CopyMemory(&dbh.dbcc_classguid, &GUID_DEVCLASS_PORTS, sizeof(GUID));
+    CopyMemory(&dbh.dbcc_classguid, &GUID_DEVINTERFACE_COMPORT, sizeof(GUID));
     if( RegisterDeviceNotification( (HANDLE)notificationWidget->winId( ), &dbh, DEVICE_NOTIFY_WINDOW_HANDLE ) == NULL)
         qWarning() << "RegisterDeviceNotification failed:" << GetLastError();
-    // setting up notifications doesn't tell us about devices already connected
-    // so get those manually
-    foreach( QextPortInfo port, getPorts() )
-      emit deviceDiscovered( port );
     #else
     qWarning("QextSerialEnumerator: GUI not enabled - can't register for device notifications.");
     #endif // QT_GUI_LIB
@@ -146,7 +159,7 @@ LRESULT QextSerialEnumerator::onDeviceChangeWin( WPARAM wParam, LPARAM lParam )
              // delimiters are different across APIs...change to backslash.  ugh.
             QString deviceID = TCHARToQString(pDevInf->dbcc_name).toUpper().replace("#", "\\");
 
-            matchAndDispatchChangedDevice(deviceID, GUID_DEVCLASS_PORTS, wParam);
+            matchAndDispatchChangedDevice(deviceID, GUID_DEVINTERFACE_COMPORT, wParam);
         }
     }
     return 0;
@@ -155,9 +168,9 @@ LRESULT QextSerialEnumerator::onDeviceChangeWin( WPARAM wParam, LPARAM lParam )
 bool QextSerialEnumerator::matchAndDispatchChangedDevice(const QString & deviceID, const GUID & guid, WPARAM wParam)
 {
     bool rv = false;
-    DWORD dwFlag = (DBT_DEVICEARRIVAL == wParam) ? DIGCF_PRESENT : DIGCF_ALLCLASSES;
+    DWORD dwFlag = (DBT_DEVICEARRIVAL == wParam) ? DIGCF_PRESENT : DIGCF_PROFILE;
     HDEVINFO devInfo;
-    if( (devInfo = SetupDiGetClassDevs(&guid,NULL,NULL,dwFlag)) != INVALID_HANDLE_VALUE )
+    if( (devInfo = SetupDiGetClassDevs(&guid,NULL,NULL,dwFlag | DIGCF_DEVICEINTERFACE)) != INVALID_HANDLE_VALUE )
     {
         SP_DEVINFO_DATA spDevInfoData;
         spDevInfoData.cbSize = sizeof(SP_DEVINFO_DATA);

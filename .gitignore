@@ -1,6 +1,63 @@
+# Build directories
+build/
+debug/
+release/
+obj-*/
+out/
+
+# qmake / Qt generated
+Makefile
+Makefile.*
+*.pro.user
+*.pro.user.*
+*.qmake.stash
+.qmake.stash
+object_script.*
+moc_*.cpp
+moc_*.h
+ui_*.h
+qrc_*.cpp
+*_plugin_import.cpp
+
+# Compiled objects and binaries
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.exp
+*.pdb
+*.ilk
+*.res
+
+# Qt Creator / IDE
+*.autosave
+*.qmlc
+*.jsc
+CMakeLists.txt.user
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Logs and local tooling
+*.log
+aqtinstall.log
+
+# OS junk
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Debian packaging leftovers
 debian/debhelper-build-stamp
 debian/files
 debian/qmodbus.debhelper.log
 debian/qmodbus.substvars
 debian/qmodbus/
-obj-x86_64-linux-gnu/
