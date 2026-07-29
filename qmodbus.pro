@@ -1,6 +1,32 @@
 TARGET = qmodbus
 TEMPLATE = app
-VERSION = 0.1.0
+
+# Single source of truth for the application version.
+# Also updates app_version.h and version.nsh (used by qmodbus.rc, About, NSIS).
+VERSION = 0.3.1
+
+VER_MAJ = $$section(VERSION, ., 0, 0)
+VER_MIN = $$section(VERSION, ., 1, 1)
+VER_PAT = $$section(VERSION, ., 2, 2)
+
+# Generate headers/scripts consumed by .rc, C++ and the NSIS installer
+APP_VERSION_H_CONTENT = \
+    "$${LITERAL_HASH}ifndef APP_VERSION_H" \
+    "$${LITERAL_HASH}define APP_VERSION_H" \
+    "" \
+    "$${LITERAL_HASH}define APP_VERSION_MAJOR $$VER_MAJ" \
+    "$${LITERAL_HASH}define APP_VERSION_MINOR $$VER_MIN" \
+    "$${LITERAL_HASH}define APP_VERSION_PATCH $$VER_PAT" \
+    "$${LITERAL_HASH}define APP_VERSION_BUILD 0" \
+    "$${LITERAL_HASH}define APP_VERSION_STR \"$$VERSION\"" \
+    "" \
+    "$${LITERAL_HASH}endif /* APP_VERSION_H */"
+write_file($$PWD/app_version.h, APP_VERSION_H_CONTENT)
+
+VERSION_NSH_CONTENT = "!define VERSION \"$$VERSION\""
+write_file($$PWD/version.nsh, VERSION_NSH_CONTENT)
+
+DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
 QT += gui widgets
 
@@ -29,12 +55,14 @@ HEADERS += src/mainwindow.h \
     src/imodbus.h \
     src/tcpipsettingswidget.h \
     src/ipaddressctrl.h \
-    src/iplineedit.h
+    src/iplineedit.h \
+    app_version.h
 
 INCLUDEPATH += 3rdparty/libmodbus \
                3rdparty/libmodbus/src \
                3rdparty/qextserialport \
-               src
+               src \
+               $$PWD
 unix {
     SOURCES += 3rdparty/qextserialport/posix_qextserialport.cpp	\
            3rdparty/qextserialport/qextserialenumerator_unix.cpp
@@ -46,6 +74,8 @@ win32 {
            3rdparty/qextserialport/qextserialenumerator_win.cpp
     DEFINES += _TTY_WIN_  WINVER=0x0501
     LIBS += -lsetupapi -lws2_32
+    # so windres finds app_version.h next to qmodbus.rc
+    RC_INCLUDEPATH += $$PWD
 }
 
 FORMS += forms/mainwindow.ui \

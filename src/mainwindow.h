@@ -28,6 +28,7 @@
 #include <QMainWindow>
 #include <QTimer>
 
+#include "app_version.h"
 #include "modbus.h"
 #include "ui_about.h"
 
@@ -43,7 +44,7 @@ public:
     {
         setupUi( this );
         aboutTextLabel->setText(
-            aboutTextLabel->text().arg( "0.3.0" ) );
+            aboutTextLabel->text().arg( QLatin1String(APP_VERSION_STR) ) );
     }
 } ;
 
