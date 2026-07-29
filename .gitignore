@@ -4,6 +4,16 @@ debug/
 release/
 obj-*/
 out/
+install/
+tools/
+
+# Generated version files (created by qmake from VERSION in qmodbus.pro)
+version.nsh
+# app_version.h is generated too, but kept in the tree so .rc builds without
+# running qmake first; qmake overwrites it when VERSION changes.
+
+# NSIS installer output (also covered by *.exe)
+QModBus-*-setup.exe
 
 # qmake / Qt generated
 Makefile

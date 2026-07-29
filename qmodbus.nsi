@@ -1,14 +1,12 @@
-
 ############################## Symbol Definitions ##############################
 !define APP_NAME "QModBus"
-!system 'echo "!define VERSION" $(git describe | sed -e "s/^v//g") > version.nsh'
-!include version.nsh
+!include "version.nsh"
 !define COMPANY "EDC Electronic Design Chemnitz GmbH"
 !define WEBSITE "http://www.ed-chemnitz.de"
 !define COPYRIGHT "© EDC Electronic Design Chemnitz GmbH 2009-2018"
-!define DESCRIPTION "Application with modbus RTU slave / TCP client"
+!define DESCRIPTION "Modbus master application (RTU / ASCII / TCP)"
 !define INSTALLER_NAME "${APP_NAME}-${VERSION}-setup.exe"
-!define APP_EXE "${APP_NAME}.exe"
+!define APP_EXE "qmodbus.exe"
 !define REG_ROOT "HKLM"
 !define REG_APP_PATH "Software\Microsoft\Windows\CurrentVersion\App Paths\${APP_EXE}"
 !define REG_UNINSTALL_PATH "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"
@@ -68,6 +66,7 @@ ShowUninstDetails show
 
 !insertmacro MUI_LANGUAGE "English"
 !insertmacro MUI_LANGUAGE "German"
+!insertmacro MUI_LANGUAGE "Russian"
 
 !insertmacro MUI_RESERVEFILE_LANGDLL
 
@@ -82,10 +81,10 @@ Section ""
 	WriteUninstaller $INSTDIR\uninstall.exe
 
 	CreateDirectory "$SMPROGRAMS\${APP_NAME}"
-	CreateShortCut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" $INSTDIR
-	CreateShortcut "$SMPROGRAMS\${APP_NAME}\Uninstall ${APP_NAME}.lnk" "$INSTDIR\uninstall.exe" $INSTDIR
+	CreateShortCut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_EXE}"
+	CreateShortcut "$SMPROGRAMS\${APP_NAME}\Uninstall ${APP_NAME}.lnk" "$INSTDIR\uninstall.exe"
 
-	CreateShortCut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" $INSTDIR
+	CreateShortCut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_EXE}"
 
 	WriteRegStr ${REG_ROOT} "${REG_APP_PATH}" "" "$INSTDIR\${APP_EXE}"
 	WriteRegStr ${REG_ROOT} "${REG_UNINSTALL_PATH}"  "DisplayName" "${APP_NAME}"
@@ -112,4 +111,3 @@ Section "Uninstall"
 	DeleteRegKey ${REG_ROOT} "${REG_APP_PATH}"
 	DeleteRegKey ${REG_ROOT} "${REG_UNINSTALL_PATH}"
 SectionEnd
-
