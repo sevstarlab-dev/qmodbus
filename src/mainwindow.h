@@ -28,6 +28,8 @@
 #include <QMainWindow>
 #include <QTimer>
 
+class QCloseEvent;
+
 #include "app_version.h"
 #include "modbus.h"
 #include "ui_about.h"
@@ -93,10 +95,16 @@ private slots:
     void onTcpPortActive(bool active);
     void resetStatus( void );
     void setStatusError(const QString &msg);
+    void onScanButtonPress( void );
+    void onStopScanButtonPress( void );
+    void scanNextSlave( void );
 
 private:
     void keyPressEvent(QKeyEvent* event);
     void keyReleaseEvent(QKeyEvent* event);
+    void closeEvent(QCloseEvent *event);
+    bool serialModbusReady( void ) const;
+    void finishSlaveScan( void );
 
     Ui::MainWindowClass * ui;
     modbus_t * m_modbus;
@@ -106,6 +114,14 @@ private:
     QTimer * m_statusTimer;
     bool m_tcpActive;
     bool m_poll;
+    bool m_scanning;
+    bool m_scanStop;
+    bool m_closeAfterScan;
+    int m_scanSlave;
+    int m_scanLast;
+    int m_scanFunc;
+    int m_scanAddr;
+    int m_scanNum;
 };
 
 #endif // MAINWINDOW_H

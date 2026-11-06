@@ -22,6 +22,8 @@
  *
  */
 
+#include <QApplication>
+#include <QCloseEvent>
 #include <QSettings>
 #include <QDebug>
 #include <QScrollBar>
@@ -40,6 +42,9 @@ const int DataTypeColumn = 0;
 const int AddrColumn = 1;
 const int DataColumn = 2;
 
+/* Modbus serial slave addresses are 1..247. */
+const int ModbusLastSlaveAddress = 247;
+
 extern MainWindow * globalMainWin;
 
 
@@ -48,7 +53,15 @@ MainWindow::MainWindow( QWidget * _parent ) :
 	ui( new Ui::MainWindowClass ),
 	m_modbus( NULL ),
 	m_tcpActive(false),
-	m_poll(false)
+	m_poll(false),
+	m_scanning( false ),
+	m_scanStop( false ),
+	m_closeAfterScan( false ),
+	m_scanSlave( 0 ),
+	m_scanLast( 0 ),
+	m_scanFunc( 0 ),
+	m_scanAddr( 0 ),
+	m_scanNum( 0 )
 {
 	ui->setupUi(this);
 
@@ -78,6 +91,10 @@ MainWindow::MainWindow( QWidget * _parent ) :
 
 	connect( ui->sendBtn, SIGNAL( clicked() ),
 			this, SLOT( onSendButtonPress() ) );
+	connect( ui->scanBtn, SIGNAL( clicked() ),
+			this, SLOT( onScanButtonPress() ) );
+	connect( ui->stopScanBtn, SIGNAL( clicked() ),
+			this, SLOT( onStopScanButtonPress() ) );
 
 	connect( ui->clearBusMonTable, SIGNAL( clicked() ),
 			this, SLOT( clearBusMonTable() ) );
@@ -122,6 +139,9 @@ void MainWindow::keyPressEvent(QKeyEvent* event)
 {
 	if( event->key() == Qt::Key_Control )
 	{
+		if( m_scanning )
+			return;
+
 		//set flag to request polling
 		if( m_modbus != NULL )
 			m_poll = true;
@@ -135,6 +155,9 @@ void MainWindow::keyReleaseEvent(QKeyEvent* event)
 {
 	if( event->key() == Qt::Key_Control )
 	{
+		if( m_scanning )
+			return;
+
 		m_poll = false;
 
 		if( ! m_pollTimer->isActive() )
@@ -580,10 +603,191 @@ void MainWindow::resetStatus( void )
 
 void MainWindow::pollForDataOnBus( void )
 {
+	if( m_scanning )
+		return;
+
 	if( m_modbus )
 	{
 		modbus_poll( m_modbus );
 	}
+}
+
+
+bool MainWindow::serialModbusReady( void ) const
+{
+	if( m_modbus == NULL || m_modbus->backend == NULL )
+		return false;
+
+	const unsigned int type = m_modbus->backend->backend_type;
+	return type == _MODBUS_BACKEND_TYPE_RTU ||
+			type == _MODBUS_BACKEND_TYPE_ASCII;
+}
+
+
+void MainWindow::onScanButtonPress( void )
+{
+	if( m_scanning )
+		return;
+
+	if( m_pollTimer->isActive() )
+	{
+		m_pollTimer->stop();
+		ui->sendBtn->setText( tr( "Send" ) );
+	}
+
+	if( !serialModbusReady() )
+	{
+		if( m_modbus != NULL )
+			setStatusError( tr( "Slave scan is available for Modbus RTU and ASCII only." ) );
+		else
+			setStatusError( tr( "Not configured!" ) );
+		return;
+	}
+
+	const int func = stringToHex( embracedString(
+					ui->functionCode->currentText() ) );
+	int num = ui->numCoils->value();
+	switch( func )
+	{
+		case MODBUS_FC_READ_COILS:
+		case MODBUS_FC_READ_DISCRETE_INPUTS:
+			if( num > MODBUS_MAX_READ_BITS )
+				num = MODBUS_MAX_READ_BITS;
+			break;
+		case MODBUS_FC_READ_HOLDING_REGISTERS:
+		case MODBUS_FC_READ_INPUT_REGISTERS:
+			if( num > MODBUS_MAX_READ_REGISTERS )
+				num = MODBUS_MAX_READ_REGISTERS;
+			break;
+		default:
+			setStatusError( tr( "Slave scan requires a read function." ) );
+			return;
+	}
+
+	m_scanFunc = func;
+	m_scanAddr = ui->startAddr->value();
+	m_scanNum = num;
+	m_scanSlave = ui->slaveID->value();
+	m_scanLast = ( m_scanSlave <= ModbusLastSlaveAddress )
+			? ModbusLastSlaveAddress
+			: ui->slaveID->maximum();
+	m_scanStop = false;
+	m_scanning = true;
+
+	ui->scanBtn->setEnabled( false );
+	ui->stopScanBtn->setEnabled( true );
+	ui->sendBtn->setEnabled( false );
+
+	m_statusTimer->stop();
+	m_statusText->setText( tr( "Scanning slave addresses..." ) );
+	m_statusInd->setStyleSheet( "background: #fc0;" );
+
+	QTimer::singleShot( 0, this, SLOT( scanNextSlave() ) );
+}
+
+
+void MainWindow::onStopScanButtonPress( void )
+{
+	if( !m_scanning )
+		return;
+
+	m_scanStop = true;
+	ui->stopScanBtn->setEnabled( false );
+	m_statusText->setText( tr( "Stopping scan..." ) );
+}
+
+
+void MainWindow::scanNextSlave( void )
+{
+	if( !m_scanning || m_scanStop || !serialModbusReady() ||
+			m_scanSlave > m_scanLast )
+	{
+		finishSlaveScan();
+		return;
+	}
+
+	m_statusText->setText( tr( "Scanning slave %1" ).arg( m_scanSlave ) );
+	m_statusInd->setStyleSheet( "background: #fc0;" );
+
+	uint8_t dest[MODBUS_MAX_READ_BITS];
+	uint16_t * dest16 = (uint16_t *) dest;
+	memset( dest, 0, sizeof( dest ) );
+
+	modbus_flush( m_modbus );
+	modbus_set_slave( m_modbus, m_scanSlave );
+
+	switch( m_scanFunc )
+	{
+		case MODBUS_FC_READ_COILS:
+			modbus_read_bits( m_modbus, m_scanAddr, m_scanNum, dest );
+			break;
+		case MODBUS_FC_READ_DISCRETE_INPUTS:
+			modbus_read_input_bits( m_modbus, m_scanAddr, m_scanNum, dest );
+			break;
+		case MODBUS_FC_READ_HOLDING_REGISTERS:
+			modbus_read_registers( m_modbus, m_scanAddr, m_scanNum, dest16 );
+			break;
+		case MODBUS_FC_READ_INPUT_REGISTERS:
+			modbus_read_input_registers( m_modbus, m_scanAddr, m_scanNum, dest16 );
+			break;
+		default:
+			m_scanStop = true;
+			finishSlaveScan();
+			return;
+	}
+
+	++m_scanSlave;
+
+	/* Flush pending Bus Monitor redraws before the next blocking request.
+	 * Without this, timer events often run ahead of paint and several
+	 * slaves appear in the monitor at once. */
+	QApplication::processEvents();
+
+	if( m_scanning && !m_scanStop )
+		QTimer::singleShot( 0, this, SLOT( scanNextSlave() ) );
+	else
+		finishSlaveScan();
+}
+
+
+void MainWindow::finishSlaveScan( void )
+{
+	if( !m_scanning )
+		return;
+
+	const bool finished = !m_scanStop && m_scanSlave > m_scanLast;
+	m_scanning = false;
+	m_scanStop = false;
+
+	ui->scanBtn->setEnabled( true );
+	ui->stopScanBtn->setEnabled( false );
+	ui->sendBtn->setEnabled( true );
+	if( !m_pollTimer->isActive() )
+		ui->sendBtn->setText( tr( "Send" ) );
+
+	m_statusText->setText( finished ? tr( "Scan finished" ) : tr( "Scan stopped" ) );
+	m_statusInd->setStyleSheet( "background: #aaa;" );
+	m_statusTimer->start( 2000 );
+
+	if( m_closeAfterScan )
+	{
+		m_closeAfterScan = false;
+		close();
+	}
+}
+
+
+void MainWindow::closeEvent( QCloseEvent *event )
+{
+	if( m_scanning )
+	{
+		m_scanStop = true;
+		m_closeAfterScan = true;
+		event->ignore();
+		return;
+	}
+
+	QMainWindow::closeEvent( event );
 }
 
 
