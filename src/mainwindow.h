@@ -29,6 +29,7 @@
 #include <QTimer>
 
 class QCloseEvent;
+class QSpinBox;
 
 #include "app_version.h"
 #include "modbus.h"
@@ -98,6 +99,8 @@ private slots:
     void onScanButtonPress( void );
     void onStopScanButtonPress( void );
     void scanNextSlave( void );
+    void onSlaveIdHexToggled( bool checked );
+    void onStartAddrHexToggled( bool checked );
 
 private:
     void keyPressEvent(QKeyEvent* event);
@@ -105,6 +108,7 @@ private:
     void closeEvent(QCloseEvent *event);
     bool serialModbusReady( void ) const;
     void finishSlaveScan( void );
+    void setSpinHexMode( QSpinBox *spin, bool hex );
 
     Ui::MainWindowClass * ui;
     modbus_t * m_modbus;

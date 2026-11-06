@@ -27,6 +27,7 @@
 #include <QSettings>
 #include <QDebug>
 #include <QScrollBar>
+#include <QSpinBox>
 
 #include <errno.h>
 
@@ -95,6 +96,10 @@ MainWindow::MainWindow( QWidget * _parent ) :
 			this, SLOT( onScanButtonPress() ) );
 	connect( ui->stopScanBtn, SIGNAL( clicked() ),
 			this, SLOT( onStopScanButtonPress() ) );
+	connect( ui->slaveIdHex, SIGNAL( toggled( bool ) ),
+			this, SLOT( onSlaveIdHexToggled( bool ) ) );
+	connect( ui->startAddrHex, SIGNAL( toggled( bool ) ),
+			this, SLOT( onStartAddrHexToggled( bool ) ) );
 
 	connect( ui->clearBusMonTable, SIGNAL( clicked() ),
 			this, SLOT( clearBusMonTable() ) );
@@ -418,6 +423,38 @@ void MainWindow::enableHexView( void )
 		func == MODBUS_FC_READ_INPUT_REGISTERS;
 
 	ui->checkBoxHexData->setEnabled( b_enabled );
+}
+
+
+void MainWindow::setSpinHexMode( QSpinBox *spin, bool hex )
+{
+	if( !spin )
+		return;
+
+	const int value = spin->value();
+	if( hex )
+	{
+		spin->setPrefix( QLatin1String( "0x" ) );
+		spin->setDisplayIntegerBase( 16 );
+	}
+	else
+	{
+		spin->setPrefix( QString() );
+		spin->setDisplayIntegerBase( 10 );
+	}
+	spin->setValue( value );
+}
+
+
+void MainWindow::onSlaveIdHexToggled( bool checked )
+{
+	setSpinHexMode( ui->slaveID, checked );
+}
+
+
+void MainWindow::onStartAddrHexToggled( bool checked )
+{
+	setSpinHexMode( ui->startAddr, checked );
 }
 
 

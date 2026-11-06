@@ -71,3 +71,5 @@ debian/files
 debian/qmodbus.debhelper.log
 debian/qmodbus.substvars
 debian/qmodbus/
+
+1.txt
